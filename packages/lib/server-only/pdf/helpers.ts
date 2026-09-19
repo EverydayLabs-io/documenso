@@ -100,8 +100,10 @@ export const decodePlaceholderValue = (value: string): string => {
     }
   }
 
+  decoded = decoded.replace(/\\%/g, '%');
+
   try {
-    return decodeURIComponent(decoded.replace(/\+/g, ' '));
+    return decodeURIComponent(decoded);
   } catch {
     return decoded;
   }
@@ -182,7 +184,7 @@ export type ParsedPlaceholderInnerContent = {
   Parse placeholder inner content: FIELD, rN, key=value, ...
 */
 export const parsePlaceholderInnerContent = (innerContent: string): ParsedPlaceholderInnerContent | undefined => {
-  const matchResult = innerContent.match(/^([^,]+),\s*(r\d+),\s*(.*)$/i);
+  const matchResult = innerContent.match(/^([^,]+),\s*(r\d+)(?:,\s*(.*))?$/i);
 
   if (!matchResult) {
     return;
@@ -191,7 +193,7 @@ export const parsePlaceholderInnerContent = (innerContent: string): ParsedPlaceh
   return {
     fieldTypeString: matchResult[1].trim(),
     recipient: matchResult[2].trim(),
-    rawFieldMeta: parsePlaceholderMetaProperties(matchResult[3]),
+    rawFieldMeta: parsePlaceholderMetaProperties(matchResult[3] ?? ''),
   };
 };
 
