@@ -72,11 +72,154 @@ export const parseFieldTypeFromPlaceholder = (fieldTypeString: string): FieldTyp
     });
 };
 
+const PLACEHOLDER_QUOTE_CHARS = new Set(['"', "'", '\u201c', '\u201d', '\u2018', '\u2019']);
+
+const isPlaceholderQuoteChar = (char: string) => PLACEHOLDER_QUOTE_CHARS.has(char);
+
+const matchingPlaceholderQuote = (openQuote: string): string => {
+  return match(openQuote)
+    .with('"', () => '"')
+    .with("'", () => "'")
+    .with('\u201c', () => '\u201d')
+    .with('\u2018', () => '\u2019')
+    .otherwise(() => openQuote);
+};
+
+/*
+  Decode a placeholder property value: optional quotes, optional %20 encoding.
+*/
+export const decodePlaceholderValue = (value: string): string => {
+  let decoded = value.trim();
+
+  if (decoded.length >= 2) {
+    const open = decoded[0];
+    const close = decoded[decoded.length - 1];
+
+    if (isPlaceholderQuoteChar(open) && close === matchingPlaceholderQuote(open)) {
+      decoded = decoded.slice(1, -1);
+    }
+  }
+
+  try {
+    return decodeURIComponent(decoded.replace(/\+/g, ' '));
+  } catch {
+    return decoded;
+  }
+};
+
+/*
+  Parse comma-separated key=value pairs, respecting quoted strings.
+*/
+export const parsePlaceholderMetaProperties = (metaString: string): Record<string, string> => {
+  const properties: Record<string, string> = {};
+  let current = '';
+  let inQuotes = false;
+  let quoteChar = '';
+
+  const pushProperty = () => {
+    const trimmed = current.trim();
+
+    if (!trimmed) {
+      current = '';
+      return;
+    }
+
+    const eqIndex = trimmed.indexOf('=');
+
+    if (eqIndex === -1) {
+      current = '';
+      return;
+    }
+
+    const key = trimmed.slice(0, eqIndex).trim();
+    const rawValue = trimmed.slice(eqIndex + 1).trim();
+
+    properties[key] = decodePlaceholderValue(rawValue);
+    current = '';
+  };
+
+  for (let index = 0; index < metaString.length; index += 1) {
+    const char = metaString[index];
+
+    if (inQuotes) {
+      current += char;
+
+      if (char === matchingPlaceholderQuote(quoteChar) && metaString[index - 1] !== '\\') {
+        inQuotes = false;
+        quoteChar = '';
+      }
+
+      continue;
+    }
+
+    if (isPlaceholderQuoteChar(char)) {
+      inQuotes = true;
+      quoteChar = char;
+      current += char;
+      continue;
+    }
+
+    if (char === ',') {
+      pushProperty();
+      continue;
+    }
+
+    current += char;
+  }
+
+  pushProperty();
+
+  return properties;
+};
+
+export type ParsedPlaceholderInnerContent = {
+  fieldTypeString: string;
+  recipient: string;
+  rawFieldMeta: Record<string, string>;
+};
+
+/*
+  Parse placeholder inner content: FIELD, rN, key=value, ...
+*/
+export const parsePlaceholderInnerContent = (innerContent: string): ParsedPlaceholderInnerContent | undefined => {
+  const matchResult = innerContent.match(/^([^,]+),\s*(r\d+),\s*(.*)$/i);
+
+  if (!matchResult) {
+    return;
+  }
+
+  return {
+    fieldTypeString: matchResult[1].trim(),
+    recipient: matchResult[2].trim(),
+    rawFieldMeta: parsePlaceholderMetaProperties(matchResult[3]),
+  };
+};
+
 /*
   Transform raw field metadata from placeholder format to schema format.
   Users should provide properly capitalized property names (e.g., readOnly, fontSize, textAlign).
   Converts string values to proper types (booleans, numbers).
 */
+const parseSelectionValuesFromPlaceholder = (
+  raw: string,
+  fieldType: FieldType,
+): Array<{ id: number; value: string; checked: boolean } | { value: string }> => {
+  const parts = raw
+    .split('|')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+
+  if (fieldType === FieldType.DROPDOWN) {
+    return parts.map((value) => ({ value }));
+  }
+
+  return parts.map((value, index) => ({
+    id: index + 1,
+    value,
+    checked: false,
+  }));
+};
+
 export const parseFieldMetaFromPlaceholder = (
   rawFieldMeta: Record<string, string>,
   fieldType: FieldType,
@@ -91,7 +234,7 @@ export const parseFieldMetaFromPlaceholder = (
 
   const fieldTypeString = String(fieldType).toLowerCase();
 
-  const parsedFieldMeta: Record<string, boolean | number | string> = {
+  const parsedFieldMeta: Record<string, unknown> = {
     type: fieldTypeString,
   };
 
@@ -104,6 +247,14 @@ export const parseFieldMetaFromPlaceholder = (
   const rawFieldMetaEntries = Object.entries(rawFieldMeta);
 
   for (const [property, value] of rawFieldMetaEntries) {
+    /*
+      CHECKBOX/RADIO/DROPDOWN selection lists are expanded after the loop from
+      `values=` or legacy `options=` (pipe-separated: Opt1|Opt2).
+    */
+    if (property === 'values' || property === 'options') {
+      continue;
+    }
+
     if (property === 'readOnly' || property === 'required') {
       parsedFieldMeta[property] = value === 'true';
     } else if (
@@ -119,6 +270,14 @@ export const parseFieldMetaFromPlaceholder = (
       }
     } else {
       parsedFieldMeta[property] = value;
+    }
+  }
+
+  if (fieldType === FieldType.CHECKBOX || fieldType === FieldType.RADIO || fieldType === FieldType.DROPDOWN) {
+    const selectionRaw = rawFieldMeta.values ?? rawFieldMeta.options;
+
+    if (selectionRaw) {
+      parsedFieldMeta.values = parseSelectionValuesFromPlaceholder(selectionRaw, fieldType);
     }
   }
 

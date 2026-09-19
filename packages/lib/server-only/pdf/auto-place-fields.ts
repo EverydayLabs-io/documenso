@@ -2,7 +2,7 @@ import { type TFieldAndMeta, ZEnvelopeFieldAndMetaSchema } from '@documenso/lib/
 import { PDF, rgb } from '@libpdf/core';
 import type { FieldType, Recipient } from '@prisma/client';
 
-import { parseFieldMetaFromPlaceholder, parseFieldTypeFromPlaceholder } from './helpers';
+import { parseFieldMetaFromPlaceholder, parseFieldTypeFromPlaceholder, parsePlaceholderInnerContent } from './helpers';
 
 const PLACEHOLDER_REGEX = /\{\{([^}]+)\}\}/g;
 const DEFAULT_FIELD_HEIGHT_PERCENT = 2;
@@ -85,8 +85,13 @@ export const extractPlaceholdersFromPDF = async (pdf: Buffer): Promise<Placehold
         continue;
       }
 
-      const placeholderData = innerMatch[1].split(',').map((property) => property.trim());
-      const [fieldTypeString, recipientOrMeta, ...fieldMetaData] = placeholderData;
+      const parsedPlaceholder = parsePlaceholderInnerContent(innerMatch[1]);
+
+      if (!parsedPlaceholder) {
+        continue;
+      }
+
+      const { fieldTypeString, recipient, rawFieldMeta } = parsedPlaceholder;
 
       let fieldType: FieldType;
 
@@ -96,20 +101,6 @@ export const extractPlaceholdersFromPDF = async (pdf: Buffer): Promise<Placehold
         // Skip placeholders with unrecognized field types.
         continue;
       }
-
-      /*
-        A recipient identifier (e.g. "r1", "R2") is required for auto-placement.
-        Placeholders without an explicit recipient like {{name}} are reserved for
-        future API use where callers can reference a placeholder by name with
-        optional dimensions instead of absolute coordinates.
-      */
-      if (!recipientOrMeta || !/^r\d+$/i.test(recipientOrMeta)) {
-        continue;
-      }
-
-      const recipient = recipientOrMeta;
-
-      const rawFieldMeta = Object.fromEntries(fieldMetaData.map((property) => property.split('=')));
 
       const parsedFieldMeta = parseFieldMetaFromPlaceholder(rawFieldMeta, fieldType);
 
