@@ -118,6 +118,56 @@ You can customize fields by adding options after the recipient identifier:
 {{text, r2, readOnly=true, text=Contract #12345}}
 ```
 
+### Checkbox, radio, and dropdown — `values=`
+
+For **checkbox**, **radio**, and **dropdown** placeholders, use **`values=`** to define the option list that appears when the document is uploaded. The legacy alias **`options=`** is also accepted (same rules).
+
+**Syntax:** pipe-separated options inside one `values=` property:
+
+```
+{{checkbox, r1, values=Option one|Option two|Option three, label=Field label, required=true}}
+{{radio, r1, values=Yes|No, label=PEP status, required=true}}
+{{dropdown, r1, values=Employment|Business|Investments|Other, label=Source of funds}}
+```
+
+Each segment between `|` becomes one checkbox choice, radio button, or dropdown entry.
+
+#### Single option (acknowledgment checkbox)
+
+Keep the option text **short** in the placeholder; put the full legal prose in the document body above it:
+
+```
+I have read and agree to the terms above.
+
+{{checkbox, r1, values=I acknowledge, label=Terms acknowledgment, required=true}}
+```
+
+Quotes are optional when the value contains no commas: `values="I acknowledge"` also works.
+
+#### Multiple options — quoting rules
+
+| Pattern | Valid? | When to use |
+| ------- | ------ | ----------- |
+| `values=opt1\|opt2\|opt3` | Yes | Options with no commas |
+| `values="opt1\|opt2\|opt3"` | Yes | **Required** when any option contains a comma |
+| `values="opt1"\|"opt2"` | **No** | Do not quote each option separately |
+
+Commas separate **meta properties** (`label=`, `required=`, …). Pipes separate **options inside** `values=`. Quotes wrap **one** property value.
+
+**Correct** (comma inside an option):
+
+```
+{{checkbox, r1, values="Income > $200k, joint|Net worth > $1M, excluding residence", label=Accredited basis, required=true}}
+```
+
+**Incorrect** (per-option quotes — only the first segment is parsed; the rest is ignored):
+
+```
+{{checkbox, r1, values="Option one"|"Option two"|"Option three", label=Example}}
+```
+
+Use **`values="opt1|opt2|opt3"`** (one quoted string), not **`values="opt1"|"opt2"`**.
+
 <Callout type="info">
   Signature and Free Signature fields do not support additional options beyond the field type and
   recipient.
@@ -178,6 +228,13 @@ When uploaded, this creates:
   <Accordion title="Placeholder Text Still Visible">
     - Placeholder text is covered with a white rectangle after field creation
     - If you see the text, try re-uploading the document
+  </Accordion>
+
+  <Accordion title="Checkbox or radio shows only one option">
+    - Use pipe-separated options in a single `values=` property: `values=Yes|No`
+    - When options contain commas, quote the **entire** list: `values="A, with comma|B"`
+    - Do **not** quote each option separately (`values="A"|"B"`)
+    - Prefer `values=` over the legacy `options=` alias in new documents
   </Accordion>
 </Accordions>
 

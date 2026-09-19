@@ -251,7 +251,11 @@ export const parseFieldMetaFromPlaceholder = (
   for (const [property, value] of rawFieldMetaEntries) {
     /*
       CHECKBOX/RADIO/DROPDOWN selection lists are expanded after the loop from
-      `values=` or legacy `options=` (pipe-separated: Opt1|Opt2).
+      `values=` or legacy `options=` (pipe-separated inside one value: Opt1|Opt2|Opt3).
+
+      Quote the entire list when options contain commas:
+        values="Option A, with comma|Option B"
+      Do not quote each option separately (`values="A"|"B"` — only the first option is kept).
     */
     if (property === 'values' || property === 'options') {
       continue;
