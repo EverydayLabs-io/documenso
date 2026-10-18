@@ -72,8 +72,8 @@ describe('parseFieldMetaFromPlaceholder checkbox/radio values', () => {
 });
 
 describe('decodePlaceholderValue', () => {
-  it('decodes %20 and LaTeX escaped percent', () => {
-    expect(decodePlaceholderValue('25%25%2B')).toBe('25%+');
+  it('strips quotes and normalizes XeLaTeX \\% to %', () => {
+    expect(decodePlaceholderValue('"Option A"')).toBe('Option A');
     expect(decodePlaceholderValue('100\\%+')).toBe('100%+');
   });
 });

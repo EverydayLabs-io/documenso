@@ -86,7 +86,8 @@ const matchingPlaceholderQuote = (openQuote: string): string => {
 };
 
 /*
-  Decode a placeholder property value: optional quotes, optional %20 encoding.
+  Normalize a placeholder property value from the PDF text layer.
+  Strips optional quotes. Maps XeLaTeX ``\%`` (from presale PDF builds) to ``%``.
 */
 export const decodePlaceholderValue = (value: string): string => {
   let decoded = value.trim();
@@ -100,13 +101,7 @@ export const decodePlaceholderValue = (value: string): string => {
     }
   }
 
-  decoded = decoded.replace(/\\%/g, '%');
-
-  try {
-    return decodeURIComponent(decoded);
-  } catch {
-    return decoded;
-  }
+  return decoded.replace(/\\%/g, '%');
 };
 
 /*
